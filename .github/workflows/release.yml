@@ -48,7 +48,7 @@ jobs:
         if: env.DRY_RUN != 'true'
         run: |
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::not a version tag: '$TAG'"; exit 1; }
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: chenzizhen237-crypto/nib
           ref: ${{ env.SOURCE_REF }}
@@ -80,17 +80,18 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: chenzizhen237-crypto/nib
           ref: ${{ env.SOURCE_REF }}
           token: ${{ secrets.NIB_SOURCE_TOKEN }}
           persist-credentials: false
-      - uses: pnpm/action-setup@v4 # version from package.json "packageManager"
-      - uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v6 # version from package.json "packageManager"
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: pnpm
+          # No dependency cache: a poisoned cache entry would end up inside published installers.
+          package-manager-cache: false
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
@@ -101,7 +102,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
       - name: Keep the dry-run installers
         if: env.DRY_RUN == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nib-${{ matrix.platform }}
           path: |
@@ -123,7 +124,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: chenzizhen237-crypto/nib
           ref: ${{ env.SOURCE_REF }}
