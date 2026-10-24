@@ -1,9 +1,12 @@
-# Builds the Nib macOS app from the private chenzizhen237-crypto/nib source and publishes it here,
-# where the in-app updater reads latest-mac.yml. It runs in this public repo because GitHub-hosted
-# runners are free for public repositories; in the private one a macOS build bills ~10x per minute.
+# Builds the Nib desktop app for macOS, Windows and Linux from the private chenzizhen237-crypto/nib
+# source and publishes it here, where the in-app updater reads latest-mac.yml, latest.yml and
+# latest-linux.yml. It runs in this public repo because GitHub-hosted runners are free for public
+# repositories; in the private one a macOS build bills ~10x per minute and Windows ~2x.
 #
 # Started by a v* tag in nib (its release.yml sends a repository_dispatch) or by hand from the
 # Actions tab. Neither trigger can come from a fork or a pull request, so the secret stays here.
+# A dry run builds, tests and packages any branch or tag and keeps the installers as run
+# artifacts for a few days, without touching releases.
 #
 # Secret: NIB_SOURCE_TOKEN, a fine-grained personal access token with "Contents: read-only" on
 # chenzizhen237-crypto/nib. Publishing uses this repo's own GITHUB_TOKEN.
@@ -31,13 +34,15 @@ concurrency:
 permissions:
   contents: write # create and publish the release in this repo
 
+env:
+  TAG: ${{ github.event.client_payload.tag || inputs.tag }}
+  DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+  SOURCE_REF: ${{ (inputs.dry_run && (github.event.client_payload.tag || inputs.tag)) || format('refs/tags/{0}', github.event.client_payload.tag || inputs.tag) }}
+
 jobs:
-  mac:
-    runs-on: macos-latest # Apple silicon: the arm64 build
-    timeout-minutes: 30
-    env:
-      TAG: ${{ github.event.client_payload.tag || inputs.tag }}
-      DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+  draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Check the tag
         if: env.DRY_RUN != 'true'
@@ -46,7 +51,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: chenzizhen237-crypto/nib
-          ref: ${{ env.DRY_RUN == 'true' && env.TAG || format('refs/tags/{0}', env.TAG) }}
+          ref: ${{ env.SOURCE_REF }}
           token: ${{ secrets.NIB_SOURCE_TOKEN }}
           persist-credentials: false
       - name: Tag matches package.json version
@@ -54,6 +59,33 @@ jobs:
         run: |
           v=$(node -p 'require("./package.json").version')
           [ "v$v" = "$TAG" ] || { echo "::error::tag $TAG but package.json says $v"; exit 1; }
+      - name: Create the draft release
+        if: env.DRY_RUN != 'true'
+        run: bash scripts/release.sh draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  build:
+    needs: draft
+    strategy:
+      fail-fast: true # one broken platform stops the release; the draft stays unpublished
+      matrix:
+        include:
+          - { os: macos-latest, platform: mac } # Apple silicon: the arm64 build
+          - { os: windows-latest, platform: win }
+          - { os: ubuntu-latest, platform: linux }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: chenzizhen237-crypto/nib
+          ref: ${{ env.SOURCE_REF }}
+          token: ${{ secrets.NIB_SOURCE_TOKEN }}
+          persist-credentials: false
       - uses: pnpm/action-setup@v4 # version from package.json "packageManager"
       - uses: actions/setup-node@v4
         with:
@@ -67,9 +99,38 @@ jobs:
         run: pnpm dist && ls -l release
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-      - name: Build and publish
+      - name: Keep the dry-run installers
+        if: env.DRY_RUN == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nib-${{ matrix.platform }}
+          path: |
+            release/*.dmg
+            release/*.exe
+            release/*.AppImage
+          retention-days: 3
+          if-no-files-found: error
+      - name: Build and upload into the draft
         if: env.DRY_RUN != 'true'
-        run: pnpm release # scripts/release.sh: draft, upload, verify, publish
+        run: bash scripts/release.sh build
         env:
           GH_TOKEN: ${{ github.token }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false" # unsigned, like local builds (mac.identity is null)
+
+  publish:
+    needs: build
+    if: inputs.dry_run != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: chenzizhen237-crypto/nib
+          ref: ${{ env.SOURCE_REF }}
+          token: ${{ secrets.NIB_SOURCE_TOKEN }}
+          persist-credentials: false
+      - name: Check every platform's files and publish
+        run: bash scripts/release.sh publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLATFORMS: mac win linux
