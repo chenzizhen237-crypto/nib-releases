@@ -5,7 +5,7 @@
 #
 # Started by a v* tag in nib (its release.yml sends a repository_dispatch) or by hand from the
 # Actions tab. Neither trigger can come from a fork or a pull request, so the secret stays here.
-# A dry run builds, tests and packages any branch or tag and keeps the installers as run
+# A dry run builds and packages any branch or tag and keeps the installers as run
 # artifacts for a few days, without touching releases.
 #
 # Secret: NIB_SOURCE_TOKEN, a fine-grained personal access token with "Contents: read-only" on
@@ -93,8 +93,8 @@ jobs:
           # No dependency cache: a poisoned cache entry would end up inside published installers.
           package-manager-cache: false
       - run: pnpm install --frozen-lockfile
+      # No tests: the tag is on main, which already passed CI in nib.
       - run: pnpm build
-      - run: pnpm test
       - name: Package (dry run, nothing published)
         if: env.DRY_RUN == 'true'
         run: pnpm dist && ls -l release
