@@ -106,9 +106,17 @@ Designs live in a workspace folder on your computer:
 
 API keys for the in-app agent stay on your computer and go only to the model provider you chose.
 
+## Rendering and known issues
+
+Nib renders with [Vello](https://github.com/linebender/vello) on WebGPU, with a CPU renderer as a
+fallback. [VELLO_COMPATIBILITY.md](VELLO_COMPATIBILITY.md) lists the Vello version each release
+ships and the hardware it's tested on; [KNOWN_ISSUES.md](KNOWN_ISSUES.md) lists what we know is
+wrong and how to work around it. Each release's notes also name its Vello version.
+
 ## Reporting a problem
 
-Open an [issue](https://github.com/chenzizhen237-crypto/nib-releases/issues) with your Nib version
+Check [KNOWN_ISSUES.md](KNOWN_ISSUES.md) first. Otherwise open an
+[issue](https://github.com/chenzizhen237-crypto/nib-releases/issues) with your Nib version
 (**Settings ▸ Updates**), your platform, and what you did. A screenshot or the file helps.
 
 ## About this repository
