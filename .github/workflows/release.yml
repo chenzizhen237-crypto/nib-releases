@@ -61,7 +61,7 @@ jobs:
           [ "v$v" = "$TAG" ] || { echo "::error::tag $TAG but package.json says $v"; exit 1; }
       - name: Create the draft release
         if: env.DRY_RUN != 'true'
-        run: bash scripts/release.sh draft
+        run: bash tooling/scripts/release.sh draft
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -113,7 +113,7 @@ jobs:
           if-no-files-found: error
       - name: Build and upload into the draft
         if: env.DRY_RUN != 'true'
-        run: bash scripts/release.sh build
+        run: bash tooling/scripts/release.sh build
         env:
           GH_TOKEN: ${{ github.token }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false" # unsigned, like local builds (mac.identity is null)
@@ -131,7 +131,7 @@ jobs:
           token: ${{ secrets.NIB_SOURCE_TOKEN }}
           persist-credentials: false
       - name: Check every platform's files and publish
-        run: bash scripts/release.sh publish
+        run: bash tooling/scripts/release.sh publish
         env:
           GH_TOKEN: ${{ github.token }}
           PLATFORMS: mac win linux
